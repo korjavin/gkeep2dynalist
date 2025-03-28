@@ -4,10 +4,33 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
+
+// ProgressStats tracks processing progress
+type ProgressStats struct {
+	TotalNotes     int
+	ProcessedNotes int
+	SkippedNotes   int
+	StartTime      time.Time
+}
+
+// Global progress statistics
+var Progress ProgressStats
+
+func init() {
+	// Seed the random number generator
+	rand.Seed(time.Now().UnixNano())
+
+	// Initialize progress tracking
+	Progress = ProgressStats{
+		StartTime: time.Now(),
+	}
+}
 
 func main() {
 	// Define command-line flags
@@ -50,13 +73,52 @@ func main() {
 		log.Printf("Cloudflare R2 environment variables not set, media uploads will be disabled")
 	}
 
+	// Count total notes first
+	countJsonFiles(*takeoutPath)
+	log.Printf("Found %d total JSON files to process", Progress.TotalNotes)
+
 	// Process Google Keep folder
 	err = processKeepFolder(*takeoutPath, dynalistToken, r2Client)
 	if err != nil {
 		log.Fatalf("Error processing Google Keep folder: %v", err)
 	}
 
-	log.Println("Successfully processed all Google Keep notes.")
+	// Display final statistics
+	duration := time.Since(Progress.StartTime).Round(time.Second)
+	log.Printf("Successfully processed %d/%d Google Keep notes in %s",
+		Progress.ProcessedNotes, Progress.TotalNotes, duration)
+	log.Printf("Skipped %d notes (archived or errors)", Progress.SkippedNotes)
+	log.Printf("API Stats: %d successful, %d failed, %d retries",
+		Stats.SuccessfulCalls, Stats.FailedCalls, Stats.Retries)
+}
+
+// countJsonFiles counts the total number of JSON files in the folder
+func countJsonFiles(folderPath string) {
+	filepath.Walk(folderPath, func(filePath string, fileInfo os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !fileInfo.IsDir() && filepath.Ext(filePath) == ".json" {
+			Progress.TotalNotes++
+		}
+		return nil
+	})
+}
+
+// displayProgress shows the current progress
+func displayProgress() {
+	percent := float64(Progress.ProcessedNotes) / float64(Progress.TotalNotes) * 100
+	elapsed := time.Since(Progress.StartTime).Round(time.Second)
+
+	// Create a simple progress bar
+	width := 30
+	completed := int(float64(width) * float64(Progress.ProcessedNotes) / float64(Progress.TotalNotes))
+	bar := strings.Repeat("=", completed) + strings.Repeat(" ", width-completed)
+
+	fmt.Printf("\r[%s] %.1f%% (%d/%d) | Elapsed: %s | API: %d ok, %d fail, %d retry | %s",
+		bar, percent, Progress.ProcessedNotes, Progress.TotalNotes,
+		elapsed, Stats.SuccessfulCalls, Stats.FailedCalls, Stats.Retries,
+		Stats.LastStatus)
 }
 
 func processKeepFolder(folderPath string, dynalistToken string, r2Client *CloudflareR2Client) error {
@@ -80,12 +142,16 @@ func processKeepFolder(folderPath string, dynalistToken string, r2Client *Cloudf
 		note, err := parseKeepNote(filePath)
 		if err != nil {
 			log.Printf("Failed to parse Keep note: %v", err)
+			Progress.SkippedNotes++
+			displayProgress()
 			return nil // Continue processing other files
 		}
 
 		// Ignore archived notes
 		if note.IsArchived {
 			log.Printf("Ignoring archived note: %s", filePath)
+			Progress.SkippedNotes++
+			displayProgress()
 			return nil
 		}
 
@@ -93,9 +159,14 @@ func processKeepFolder(folderPath string, dynalistToken string, r2Client *Cloudf
 		err = processMessage(note, folderPath, dynalistToken, r2Client, filePath)
 		if err != nil {
 			log.Printf("Failed to process message: %v", err)
+			Progress.SkippedNotes++
+			displayProgress()
 			return nil // Continue processing other files
 		}
 
+		// Update progress
+		Progress.ProcessedNotes++
+		displayProgress()
 		return nil
 	})
 }
