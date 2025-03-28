@@ -72,8 +72,26 @@ func shortenFilename(filename string) string {
 	name := filepath.Base(filename)
 	ext := filepath.Ext(filename)
 	base := strings.TrimSuffix(name, ext)
-	if len(base) > 20 {
-		base = base[:20] + "..."
+
+	// Remove timestamp patterns often found in filenames
+	// Common formats: 2024-03-25T19_29_21.446+01_00
+	timestampPatterns := []string{
+		`\d{4}-\d{2}-\d{2}T\d{2}_\d{2}_\d{2}`,
+		`\d{4}-\d{2}-\d{2}`,
+		`\d{2}_\d{2}_\d{2}`,
 	}
+
+	for _, pattern := range timestampPatterns {
+		base = strings.Split(base, pattern)[0]
+	}
+
+	// Trim any leading/trailing special characters
+	base = strings.Trim(base, "._- ")
+
+	// Shorten to 15 characters max
+	if len(base) > 15 {
+		base = base[:15] + "..."
+	}
+
 	return base
 }

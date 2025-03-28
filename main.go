@@ -136,7 +136,45 @@ func processMessage(note *KeepNote, folderPath string, dynalistToken string, r2C
 	// Set the title
 	title := note.Title
 	if title == "" {
-		title = shortenFilename(filePath)
+		// Use shortened filename
+		baseTitle := shortenFilename(filePath)
+
+		// Add first few lines of content to title if available
+		if note.TextContent != "" {
+			// Get first few lines of content
+			contentLines := strings.Split(note.TextContent, "\n")
+			previewText := ""
+
+			// Take up to 2 non-empty lines for the preview
+			lineCount := 0
+			for _, line := range contentLines {
+				trimmedLine := strings.TrimSpace(line)
+				if trimmedLine != "" {
+					if previewText != "" {
+						previewText += " | "
+					}
+					// Limit each line to 30 chars
+					if len(trimmedLine) > 30 {
+						previewText += trimmedLine[:30] + "..."
+					} else {
+						previewText += trimmedLine
+					}
+
+					lineCount++
+					if lineCount >= 2 {
+						break
+					}
+				}
+			}
+
+			if previewText != "" {
+				title = baseTitle + ": " + previewText
+			} else {
+				title = baseTitle
+			}
+		} else {
+			title = baseTitle
+		}
 	}
 	title = "gkeep: " + title
 
