@@ -129,9 +129,7 @@ func processMessage(note *KeepNote, folderPath string, dynalistToken string, r2C
 	if len(attachmentLinks) > 0 {
 		noteContent += "\n\nAttachments:\n" + strings.Join(attachmentLinks, "\n")
 	}
-	if hashtags != "" {
-		noteContent += "\n\n" + hashtags
-	}
+	// Tags will now go in the title, not in the note content
 
 	// Set the title
 	title := note.Title
@@ -176,7 +174,12 @@ func processMessage(note *KeepNote, folderPath string, dynalistToken string, r2C
 			title = baseTitle
 		}
 	}
+
+	// Add prefix and tags to title
 	title = "gkeep: " + title
+	if hashtags != "" {
+		title += " " + hashtags
+	}
 
 	// Forward the message to Dynalist
 	err := AddToDynalist(dynalistToken, title, noteContent)
