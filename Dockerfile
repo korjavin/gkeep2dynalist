@@ -1,4 +1,4 @@
-t # Use the official Go image as the base image
+# Use the official Go image as the base image
 FROM golang:1.24 AS builder
 
 # Set the working directory inside the container
