@@ -17,6 +17,7 @@ type KeepNote struct {
 	Labels                  []Label      `json:"labels,omitempty"`
 	UserEditedTimestampUsec int64        `json:"userEditedTimestampUsec"`
 	CreatedTimestampUsec    int64        `json:"createdTimestampUsec"`
+	IsArchived              bool         `json:"isArchived"` // Add IsArchived field
 	// Other fields...
 }
 
@@ -64,4 +65,15 @@ func findAttachmentFile(folderPath string, attachmentPath string) (string, error
 		return attachmentFile, nil
 	}
 	return "", fmt.Errorf("attachment file not found: %s", attachmentPath)
+}
+
+// shortenFilename shortens a filename for use as a title
+func shortenFilename(filename string) string {
+	name := filepath.Base(filename)
+	ext := filepath.Ext(filename)
+	base := strings.TrimSuffix(name, ext)
+	if len(base) > 20 {
+		base = base[:20] + "..."
+	}
+	return base
 }

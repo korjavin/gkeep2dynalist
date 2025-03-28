@@ -83,8 +83,14 @@ func processKeepFolder(folderPath string, dynalistToken string, r2Client *Cloudf
 			return nil // Continue processing other files
 		}
 
+		// Ignore archived notes
+		if note.IsArchived {
+			log.Printf("Ignoring archived note: %s", filePath)
+			return nil
+		}
+
 		// Process the message
-		err = processMessage(note, folderPath, dynalistToken, r2Client)
+		err = processMessage(note, folderPath, dynalistToken, r2Client, filePath)
 		if err != nil {
 			log.Printf("Failed to process message: %v", err)
 			return nil // Continue processing other files
@@ -94,7 +100,7 @@ func processKeepFolder(folderPath string, dynalistToken string, r2Client *Cloudf
 	})
 }
 
-func processMessage(note *KeepNote, folderPath string, dynalistToken string, r2Client *CloudflareR2Client) error {
+func processMessage(note *KeepNote, folderPath string, dynalistToken string, r2Client *CloudflareR2Client, filePath string) error {
 	var attachmentLinks []string
 	// Process attachments
 	if r2Client != nil && len(note.Attachments) > 0 {
@@ -127,8 +133,15 @@ func processMessage(note *KeepNote, folderPath string, dynalistToken string, r2C
 		noteContent += "\n\n" + hashtags
 	}
 
+	// Set the title
+	title := note.Title
+	if title == "" {
+		title = shortenFilename(filePath)
+	}
+	title = "gkeep: " + title
+
 	// Forward the message to Dynalist
-	err := AddToDynalist(dynalistToken, note.Title, noteContent)
+	err := AddToDynalist(dynalistToken, title, noteContent)
 	if err != nil {
 		log.Printf("Failed to add message to Dynalist: %v", err)
 		return err
